@@ -1,10 +1,3 @@
-"""
-FileName: 
-Author: 
-Version: 
-Date: 2025/7/201:18
-Description: 
-"""
 import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 from torch.nn.functional import one_hot
@@ -25,25 +18,16 @@ class BaseGraph(Data):
             subG_node: a matrix like [[0,2,3],[1,4,5],[6,7,-1]], whose i-th row contains the nodes in the i-th subgraph. -1 is for padding.
             subG_label: the target of subgraphs.
             mask: of shape (number of subgraphs), type torch.long. mask[i]=0,1,2 if i-th subgraph is in the training set, validation set and test set respectively.
-
-            subG_node是子图节点矩阵，每一行表示一个子图的节点
         '''
         super(BaseGraph, self).__init__(x=x,
                                         edge_index=edge_index,
                                         edge_attr=edge_weight,
                                         pos=subG_node,
                                         y=subG_label)
-        # 注意这里的subG_label实际上是一个标签列表，每个标签代表一个子图的标签，例如ppi_bp就是子图标签类型总共有6类
-        # 例如[0,1,2,3,4,5]
         self.mask = mask
-        self.to_undirected() # 确保图为无向图
+        self.to_undirected()
 
-    # 特征添加方法
     def addDegreeFeature(self):
-        '''
-        将节点度的独热编码作为节点特征添加到现有特征中
-        :return:
-        '''
         # For GNN-seg only, use one-hot node degree as node features.
         adj = torch.sparse_coo_tensor(self.edge_index, self.edge_attr,
                                       (self.x.shape[0], self.x.shape[0]))
@@ -53,21 +37,12 @@ class BaseGraph(Data):
                            dim=-1)
 
     def addOneFeature(self):
-        '''
-        将全 1 向量作为节点特征添加到现有特征中
-        :return:
-        '''
         # For GNN-seg only, use one as node features.
         self.x = torch.cat(
             (self.x, torch.ones(self.x.shape[0], self.x.shape[1], 1)),
             dim=-1)
 
     def setDegreeFeature(self, mod=1):
-        '''
-        将节点度作为节点特征，可对节点度进行取模操作并映射为唯一索引。
-        :param mod:
-        :return:
-        '''
         # use node degree as node features.
         adj = torch.sparse_coo_tensor(self.edge_index, self.edge_attr,
                                       (self.x.shape[0], self.x.shape[0]))
@@ -77,47 +52,25 @@ class BaseGraph(Data):
         self.x = degree.reshape(self.x.shape[0], 1, -1)
 
     def setOneFeature(self):
-        '''
-        将全 1 向量作为节点特征，覆盖原有特征
-        :return:
-        '''
         # use homogeneous node features.
         self.x = torch.ones((self.x.shape[0], 1, 1), dtype=torch.int64)
 
     def setNodeIdFeature(self):
-        '''
-        将节点 ID 作为节点特征，覆盖原有特征
-        :return:
-        '''
         # use nodeid as node features.
         self.x = torch.arange(self.x.shape[0], dtype=torch.int64).reshape(
             self.x.shape[0], 1, -1)
 
     def get_split(self, split: str):
-        '''
-        根据指定的划分类型（训练集、验证集或测试集）返回相应的数据。
-        :param split:
-        :return:
-        '''
         tar_mask = {"train": 0, "valid": 1, "test": 2}[split]
         return self.x, self.edge_index, self.edge_attr, self.pos[
             self.mask == tar_mask], self.y[self.mask == tar_mask]
 
     def to_undirected(self):
-        '''
-        如果图不是无向图，则将其转换为无向图。
-        :return:
-        '''
         if not is_undirected(self.edge_index):
             self.edge_index, self.edge_attr = to_undirected(
                 self.edge_index, self.edge_attr)
 
     def get_LPdataset(self, use_loop=False):
-        '''
-        生成用于预训练图神经网络的链接预测数据集，包含正样本和负样本。
-        :param use_loop:
-        :return:
-        '''
         # generate link prediction dataset for pretraining GNNs
         neg_edge = negative_sampling(self.edge_index)
         x = self.x
@@ -148,37 +101,7 @@ class BaseGraph(Data):
 
 
 def load_dataset(name: str):
-    '''
-    根据传入的数据集名称 name 加载对应的数据集
-    并将其封装为 BaseGraph 对象返回
-    :param name:
-    :return:
-    '''
-    # To use your own dataset, add a branch returning a BaseGraph Object here.
-    if name in ["coreness", "cut_ratio", "density", "component"]:
-        obj = np.load(f"../dataset_/{name}/tmp.npy", allow_pickle=True).item()
-        # copied from https://github.com/mims-harvard/SubGNN/blob/main/SubGNN/subgraph_utils.py
-        edge = np.array([[i[0] for i in obj['G'].edges],
-                         [i[1] for i in obj['G'].edges]])
-        degree = obj['G'].degree
-        node = [n for n in obj['G'].nodes]
-        subG = obj["subG"]
-        subG_pad = pad_sequence([torch.tensor(i) for i in subG],
-                                batch_first=True,
-                                padding_value=-1)
-        subGLabel = torch.tensor([ord(i) - ord('A') for i in obj["subGLabel"]])
-        # mask = torch.tensor(obj['mask'])
-        cnt = subG_pad.shape[0]
-        mask = torch.cat(
-            (torch.zeros(cnt - cnt // 2, dtype=torch.int64),
-             torch.ones(cnt // 4, dtype=torch.int64),
-             2 * torch.ones(cnt // 2 - cnt // 4, dtype=torch.int64)))
-        mask = mask[torch.randperm(mask.shape[0])]
-        return BaseGraph(torch.empty(
-            (len(node), 1, 0)), torch.from_numpy(edge),
-            torch.ones(edge.shape[1]), subG_pad, subGLabel, mask)
-    elif name in ["ppi_bp", "hpo_metab", "hpo_neuro", "em_user"]:
-        # 初始化多标签任务为False
+    if name in ["ppi_bp", "hpo_metab", "hpo_neuro", "em_user"]:
         multilabel = False
 
         # copied from https://github.com/mims-harvard/SubGNN/blob/main/SubGNN/subgraph_utils.py
@@ -268,14 +191,8 @@ def load_dataset(name: str):
             for idx, ll in enumerate(tlist):
                 label[idx][torch.LongTensor(ll)] = 1
         else:
-            # ppi_bp数据集直接拼接标签，但是标签只是0-5
-            # 理解这里的标签，ppi-bp数据集的基本图是一个人类蛋白质-蛋白质相互作用网络。每个子图都是由生物过程中的蛋白质诱导的，其标签是其细胞功能。
-            # 所以这里的label代表了每个子图的标签，可能有多个子图是同一个标签
-            # 在SUBGNN的论文中有如下介绍：蛋白质子图根据其细胞功能从六个类别(例如“代谢”，“发育”等)进行标记。
             label = torch.cat(
                 (train_sub_G_label, val_sub_G_label, test_sub_G_label))
-        # 对所有子图的节点列表进行填充，使其长度一致
-        # 例如ppi_bp中子图为1591个子图，训练集有1272个子图，这样对每个子图的节点列表进行填充，使其长度一致，变成[[],[],[]..]例如（1272,1600
         pos = pad_sequence(
             [torch.tensor(i) for i in train_sub_G + val_sub_G + test_sub_G],
             batch_first=True,
@@ -284,7 +201,6 @@ def load_dataset(name: str):
         edge_index = torch.tensor([[int(i[0]), int(i[1])]
                                    for i in rawedge]).t()
         num_node = max([torch.max(pos), torch.max(edge_index)]) + 1
-        # 初始化节点特征为空张量
         x = torch.empty((num_node, 1, 0))
 
         return BaseGraph(x, edge_index, torch.ones(edge_index.shape[1]), pos,

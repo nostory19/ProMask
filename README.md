@@ -32,7 +32,7 @@ python GNNEmb.py --use_nodeid --device $gpu_id --dataset $dataset --name $datase
 ```
 Then 
 ```
-python SAWBNTest.py --use_nodeid --use_seed --use_maxzeroone --repeat 10 --device $gpu_id --dataset $dataset
+python ProMask.py --use_nodeid --use_seed  --repeat 10 --device $gpu_id --dataset $dataset
 ```
 where $dataset can be selected from em_user, ppi_bp, hpo_metab, and hpo_neuro.
 
