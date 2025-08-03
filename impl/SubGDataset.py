@@ -1,11 +1,3 @@
-"""
-FileName: 
-Author: 
-Version: 
-Date: 2025/7/201:11
-Description: 
-"""
-from torch_geometric.data import Data
 import torch
 from torch.utils.data import DataLoader
 
@@ -78,28 +70,28 @@ class GDataloader(DataLoader):
         return self.get_x(), self.get_ei(), self.get_ea(), self.get_pos(
         )[perm], self.get_y()[perm]
 
-
-class ZGDataloader(GDataloader):
-    '''
-    Dataloader for GDataset.
-    Args:
-        z_fn: assigning node label for each batch.
-    '''
-    def __init__(self,
-                 Gdataset,
-                 batch_size=64,
-                 shuffle=True,
-                 drop_last=False,
-                 z_fn=lambda x, y: torch.zeros(
-                     (x.shape[0], x.shape[1]), dtype=torch.int64)):
-        super(ZGDataloader, self).__init__(Gdataset, batch_size, shuffle,
-                                           drop_last)
-        self.z_fn = z_fn
-
-    def __next__(self):
-        perm = next(self.iter)
-        tpos = self.get_pos()[perm]
-        # ei:edge_index  ea:edge_attribute
-        return self.get_x(), self.get_ei(), self.get_ea(), tpos, self.z_fn(
-            self.get_x(), tpos), self.get_y()[perm]
-
+# GLASS method
+# class ZGDataloader(GDataloader):
+#     '''
+#     Dataloader for GDataset.
+#     Args:
+#         z_fn: assigning node label for each batch.
+#     '''
+#     def __init__(self,
+#                  Gdataset,
+#                  batch_size=64,
+#                  shuffle=True,
+#                  drop_last=False,
+#                  z_fn=lambda x, y: torch.zeros(
+#                      (x.shape[0], x.shape[1]), dtype=torch.int64)):
+#         super(ZGDataloader, self).__init__(Gdataset, batch_size, shuffle,
+#                                            drop_last)
+#         self.z_fn = z_fn
+#
+#     def __next__(self):
+#         perm = next(self.iter)
+#         tpos = self.get_pos()[perm]
+#         # ei:edge_index  ea:edge_attribute
+#         return self.get_x(), self.get_ei(), self.get_ea(), tpos, self.z_fn(
+#             self.get_x(), tpos), self.get_y()[perm]
+#

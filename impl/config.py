@@ -1,17 +1,9 @@
-"""
-FileName: 
-Author: 
-Version: 
-Date: 2025/7/120:44
-Description: 
-"""
 import torch
 
 device = None
 
 def set_device(idx):
     '''
-    设置设备
     :param idx:
     :return:
     '''

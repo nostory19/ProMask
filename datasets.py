@@ -1,4 +1,3 @@
-import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 from torch.nn.functional import one_hot
 import torch
@@ -156,28 +155,28 @@ def load_dataset(name: str):
             return train_sub_G, train_sub_G_label, val_sub_G, val_sub_G_label, test_sub_G, test_sub_G_label
 
         if os.path.exists(
-                f"../dataset/{name}/train_sub_G.pt") and name != "hpo_neuro":
-            train_sub_G = torch.load(f"../dataset/{name}/train_sub_G.pt")
+                f"./dataset/{name}/train_sub_G.pt") and name != "hpo_neuro":
+            train_sub_G = torch.load(f"./dataset/{name}/train_sub_G.pt")
             train_sub_G_label = torch.load(
-                f"../dataset/{name}/train_sub_G_label.pt")
-            val_sub_G = torch.load(f"../dataset/{name}/val_sub_G.pt")
+                f"./dataset/{name}/train_sub_G_label.pt")
+            val_sub_G = torch.load(f"./dataset/{name}/val_sub_G.pt")
             val_sub_G_label = torch.load(
-                f"../dataset/{name}/val_sub_G_label.pt")
-            test_sub_G = torch.load(f"../dataset/{name}/test_sub_G.pt")
+                f"./dataset/{name}/val_sub_G_label.pt")
+            test_sub_G = torch.load(f"./dataset/{name}/test_sub_G.pt")
             test_sub_G_label = torch.load(
-                f"../dataset/{name}/test_sub_G_label.pt")
+                f"./dataset/{name}/test_sub_G_label.pt")
         else:
             # 调用read_subgraphs函数
             train_sub_G, train_sub_G_label, val_sub_G, val_sub_G_label, test_sub_G, test_sub_G_label = read_subgraphs(
-                f"../dataset/{name}/subgraphs.pth")
-            torch.save(train_sub_G, f"../dataset/{name}/train_sub_G.pt")
+                f"./dataset/{name}/subgraphs.pth")
+            torch.save(train_sub_G, f"./dataset/{name}/train_sub_G.pt")
             torch.save(train_sub_G_label,
-                       f"../dataset/{name}/train_sub_G_label.pt")
-            torch.save(val_sub_G, f"../dataset/{name}/val_sub_G.pt")
-            torch.save(val_sub_G_label, f"../dataset/{name}/val_sub_G_label.pt")
-            torch.save(test_sub_G, f"../dataset/{name}/test_sub_G.pt")
+                       f"./dataset/{name}/train_sub_G_label.pt")
+            torch.save(val_sub_G, f"./dataset/{name}/val_sub_G.pt")
+            torch.save(val_sub_G_label, f"./dataset/{name}/val_sub_G_label.pt")
+            torch.save(test_sub_G, f"./dataset/{name}/test_sub_G.pt")
             torch.save(test_sub_G_label,
-                       f"../dataset/{name}/test_sub_G_label.pt")
+                       f"./dataset/{name}/test_sub_G_label.pt")
         # 拼接训练集，验证集和测试的掩码，分别用0,1,2表示
         mask = torch.cat(
             (torch.zeros(len(train_sub_G_label), dtype=torch.int64),
@@ -197,7 +196,7 @@ def load_dataset(name: str):
             [torch.tensor(i) for i in train_sub_G + val_sub_G + test_sub_G],
             batch_first=True,
             padding_value=-1)
-        rawedge = nx.read_edgelist(f"../dataset/{name}/edge_list.txt").edges
+        rawedge = nx.read_edgelist(f"./dataset/{name}/edge_list.txt").edges
         edge_index = torch.tensor([[int(i[0]), int(i[1])]
                                    for i in rawedge]).t()
         num_node = max([torch.max(pos), torch.max(edge_index)]) + 1

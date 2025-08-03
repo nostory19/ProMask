@@ -1,10 +1,3 @@
-"""
-FileName: 
-Author: 
-Version: 
-Date: 2025/7/120:48
-Description: 
-"""
 from sklearn.metrics import f1_score, roc_auc_score
 import numpy as np
 
@@ -16,7 +9,6 @@ def binaryf1(pred, label):
     :param label:
     :return:
     '''
-    # 将预测值转换为0和1
     pred_i = (pred > 0).astype(np.int64)
     label_i = label.reshape(pred.shape[0], -1)
     return f1_score(label_i, pred_i, average='macro')

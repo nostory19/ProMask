@@ -30,7 +30,6 @@ parser.add_argument('--use_seed', action='store_true', default=True)
 args = parser.parse_args()
 config.set_device(args.device)
 
-
 def set_seed(seed: int):
     print("seed ", seed)
     random.seed(seed)
@@ -104,34 +103,11 @@ def split():
     val_dataset = SubGDataset.GDataset(*baseG.get_split("valid"))  # 验证集有159
     tst_dataset = SubGDataset.GDataset(*baseG.get_split("test"))  # 160个
     # choice of dataloader
-    if args.use_maxzeroone:
-        def tfunc(ds, bs, shuffle=True, drop_last=True):
-            '''
+    def loader_fn(ds, bs):
+        return SubGDataset.GDataloader(ds, bs)
 
-            :param ds: dataset (edge_attr, edge_index, num_nodes, pos, x, y)
-            :param bs: batchsize
-            :param shuffle:
-            :param drop_last:
-            :return:
-            '''
-            return SubGDataset.ZGDataloader(ds,
-                                            bs,
-                                            z_fn=utils.MaxZOZ,
-                                            shuffle=shuffle,
-                                            drop_last=drop_last)
-
-        def loader_fn(ds, bs):
-            return tfunc(ds, bs)
-
-        def tloader_fn(ds, bs):
-            return tfunc(ds, bs, True, False)
-    else:
-
-        def loader_fn(ds, bs):
-            return SubGDataset.GDataloader(ds, bs)
-
-        def tloader_fn(ds, bs):
-            return SubGDataset.GDataloader(ds, bs, shuffle=True)
+    def tloader_fn(ds, bs):
+        return SubGDataset.GDataloader(ds, bs, shuffle=True)
 
 
 def buildModel(hidden_dim, conv_layer, dropout, jk, pool, z_ratio, aggr):

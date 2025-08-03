@@ -28,11 +28,11 @@ To reproduce our results on real-world datasets:
 
 We have provided our SSL embeddings in ./Emb/. You can also reproduce them by
 ```
-python GNNEmb.py --use_nodeid --device $gpu_id --dataset $dataset --name $dataset
+python GNNEmb.py --device $gpu_id --dataset $dataset --name $dataset
 ```
 Then 
 ```
-python ProMask.py --use_nodeid --use_seed  --repeat 10 --device $gpu_id --dataset $dataset
+python ProMask.py --repeat 10 --device $gpu_id --dataset $dataset
 ```
 where $dataset can be selected from em_user, ppi_bp, hpo_metab, and hpo_neuro.
 

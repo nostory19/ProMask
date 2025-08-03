@@ -1,4 +1,3 @@
-
 from torch_geometric.nn.norm import GraphNorm, GraphSizeNorm
 from torch_geometric.nn.glob.glob import global_mean_pool, global_add_pool, global_max_pool
 from .utils import pad2batch
@@ -140,7 +139,7 @@ class DynamicProtoMask(nn.Module):
             nn.Linear(in_channels, 1)
         )
         self.temp = nn.Parameter(torch.tensor(10.0))
-        self.adj = torch.sparse_coo_tensor(size=(0,0))
+        self.adj = torch.sparse_coo_tensor(size=(0, 0))
 
     def forward(self, x, edge_index, edge_weight, subG_node, tau=0.7, top_k=None):
         x_proj = self.lin(x)  # (21521, 64)
@@ -159,20 +158,20 @@ class DynamicProtoMask(nn.Module):
             node_idx = torch.cat(subG_node)
         n_node = x.shape[0]
         att_score = self.att_mlp(x_proj[node_idx]).squeeze(-1)
-        att_score = scatter.scatter_softmax(att_score, batch_idx) 
+        att_score = scatter.scatter_softmax(att_score, batch_idx)
         # Calculate the weighted prototype
         weighted_x = x_proj[node_idx] * att_score.unsqueeze(-1)
         proto = scatter.scatter(weighted_x,
                                 batch_idx,
                                 dim=0,
                                 dim_size=batch_idx.max() + 1,
-                                reduce="sum")  
+                                reduce="sum")
         x_norm = F.normalize(x_proj, dim=-1)  # (21521, 64)
         proto_norm = F.normalize(proto, dim=-1)  # (80, 64)
-        sim_mat = x_norm @ proto_norm.t() 
+        sim_mat = x_norm @ proto_norm.t()
 
-        hard_mask = torch.zeros(x.size(0), device=x.device) 
-        hard_mask[node_idx] = 1.0 
+        hard_mask = torch.zeros(x.size(0), device=x.device)
+        hard_mask[node_idx] = 1.0
 
         if top_k is None:
             percent = 0.99  # 0.9 ->top 10%
@@ -181,7 +180,7 @@ class DynamicProtoMask(nn.Module):
             candidate_numpy = candidate.detach().cpu().numpy()
 
             sim_max_score, sim_argmax = sim_mat.max(dim=1)
-            candidate_idx = (candidate == 1.0).nonzero(as_tuple=False).squeeze(-1) 
+            candidate_idx = (candidate == 1.0).nonzero(as_tuple=False).squeeze(-1)
             candidate_subgraph_assignment = sim_argmax[candidate_idx]  # [num_candidate_nodes]
         else:
             candidate = torch.zeros_like(hard_mask)
@@ -195,17 +194,13 @@ class DynamicProtoMask(nn.Module):
         return final_mask.unsqueeze(-1), proto, candidate_idx, candidate_subgraph_assignment  # (N,1)
 
 
-
 class MaskConv(torch.nn.Module):
     '''
     A kind of message passing layer we use for ProMaskNet.
     We use different parameters to transform the features of node with different labels individually, and mix them.
     Args:
-        aggr: the aggregation method. 聚合方法
-        z_ratio: the ratio to mix the transformed features. 混合特征的比例
-    一种用于GLASS的消息传递层
-    使用不同的参数对具有不同标签的节点的特征进行变换，并混合它们
-    一层GLASSConv包含进行trans_fns和comb_fns的操作
+        aggr: the aggregation method.
+        z_ratio: the ratio to mix the transformed features.
     '''
 
     def __init__(self,
@@ -242,9 +237,9 @@ class MaskConv(torch.nn.Module):
     def forward(self, x_, edge_index, edge_weight, mask):
         if self.adj.shape[0] == 0:
             n_node = x_.shape[0]
-            self.adj = buildAdj(edge_index, edge_weight, n_node, self.aggr) 
-        # transform node features with different parameters individually.
-        x1 = self.activation(self.trans_fns[1](x_)) 
+            self.adj = buildAdj(edge_index, edge_weight, n_node, self.aggr)
+            # transform node features with different parameters individually.
+        x1 = self.activation(self.trans_fns[1](x_))
         x0 = self.activation(self.trans_fns[0](x_))
         # mix transformed feature.
         x = torch.where(mask, self.z_ratio * x1 + (1 - self.z_ratio) * x0,
@@ -253,7 +248,7 @@ class MaskConv(torch.nn.Module):
         x = self.adj @ x
         x = self.gn(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
-        x = torch.cat((x, x_), dim=-1)  
+        x = torch.cat((x, x_), dim=-1)
         # transform node features with different parameters individually.
         x1 = self.comb_fns[1](x)
         x0 = self.comb_fns[0](x)
@@ -262,12 +257,13 @@ class MaskConv(torch.nn.Module):
                         self.z_ratio * x0 + (1 - self.z_ratio) * x1)
         return x
 
+
 class PPRDiffusedGCN(nn.Module):
     def __init__(self, channels, num_layers, alpha=0.15, k=10, use_residual=True):
         super().__init__()
-        self.gcn = GCNConv(channels, channels*num_layers)
-        self.layer_norm = nn.LayerNorm(channels*num_layers)
-        self.graph_norm = GraphNorm(channels*num_layers)
+        self.gcn = GCNConv(channels, channels * num_layers)
+        self.layer_norm = nn.LayerNorm(channels * num_layers)
+        self.graph_norm = GraphNorm(channels * num_layers)
         self.act = nn.ELU()
         self.alpha = alpha
         self.k = k
@@ -309,10 +305,12 @@ class PPRDiffusedGCN(nn.Module):
         out = self.layer_norm(out)
         # batch = batch.to(out.device)
         # if batch is not None:
-            # out = self.graph_norm(out, batch)
+        # out = self.graph_norm(out, batch)
         out = self.act(out)
 
         return out
+
+
 class EmbMaskConv(nn.Module):
     '''
     combination of some MaskConv layers, normalization layers, dropout layers, and activation function.
@@ -369,11 +367,11 @@ class EmbMaskConv(nn.Module):
 
         self.sub_mask = DynamicProtoMask(in_channels=hidden_channels,
                                          max_deg=max_deg)  # (in_channels:64, out: 64)
-        self.virtual_gnn = GCNConv(hidden_channels,hidden_channels)
+        self.virtual_gnn = GCNConv(hidden_channels, hidden_channels)
         self.reset_parameters()
         self.ppr_diffused_gnn = PPRDiffusedGCN(hidden_channels, num_layers, alpha=0.2, k=8)
+
     def reset_parameters(self):
-        # 重置模块中可学习参数
         self.input_emb.reset_parameters()
         self.emb_gn.reset_parameters()
         for conv in self.convs:
@@ -384,9 +382,10 @@ class EmbMaskConv(nn.Module):
 
     def forward(self, x, edge_index, edge_weight, subG_node, edge_index_virtual, z=None):
         # convert integer input to vector node features.
-        x = self.input_emb(x).reshape(x.shape[0], -1) # (N,64)
-        x = self.emb_gn(x) # (N, 64)
-        mask_soft, proto, candidate_idx, candidate_subgraph_assignment = self.sub_mask(x, edge_index, edge_weight, subG_node)
+        x = self.input_emb(x).reshape(x.shape[0], -1)  # (N,64)
+        x = self.emb_gn(x)  # (N, 64)
+        mask_soft, proto, candidate_idx, candidate_subgraph_assignment = self.sub_mask(x, edge_index, edge_weight,
+                                                                                       subG_node)
         mask_soft = mask_soft.reshape(-1, 1)
         proto_updated = self.ppr_diffused_gnn(proto, edge_index_virtual, batch=torch.arange(proto.size(0)))
         mask = (mask_soft > 0.5)
@@ -395,8 +394,9 @@ class EmbMaskConv(nn.Module):
         # pass messages at each layer. 
         for layer, conv in enumerate(self.convs[:-1]):
             proto_updated = self.ppr_diffused_gnn(proto, edge_index_virtual, batch=torch.arange(proto.size(0)))
-            x = conv(x, edge_index, edge_weight, mask) 
-            mask_soft, proto, candidate_idx, candidate_subgraph_assignment = self.sub_mask(x, edge_index, edge_weight, subG_node)
+            x = conv(x, edge_index, edge_weight, mask)
+            mask_soft, proto, candidate_idx, candidate_subgraph_assignment = self.sub_mask(x, edge_index, edge_weight,
+                                                                                           subG_node)
             mask_soft = mask_soft.reshape(-1, 1)
             mask = (mask_soft > 0.5)
             xs.append(x)
@@ -404,12 +404,12 @@ class EmbMaskConv(nn.Module):
                 x = self.gns[layer](x)
             x = self.activation(x)
             x = F.dropout(x, p=self.dropout, training=self.training)
-            
+
         x = self.convs[-1](x, edge_index, edge_weight, mask)
         xs.append(x)
 
         if self.jk:
-            x = torch.cat(xs, dim=-1) 
+            x = torch.cat(xs, dim=-1)
             if not (self.gns is None):
                 x = self.gns[-1](x)
             return x, proto_updated, candidate_idx, candidate_subgraph_assignment
@@ -468,8 +468,6 @@ class SizePool(AddPool):
         return self.pool_fn(x, batch)
 
 
-
-
 class FlexibleMLP(nn.Module):
     def __init__(self, channel_list, act=nn.ELU(), dropout=0.5):
         super().__init__()
@@ -493,7 +491,6 @@ class ProMaskNet(nn.Module):
     Args:
         preds and pools are ModuleList containing the same number of MLPs and Pooling layers.
         preds[id] and pools[id] is used to predict the id-th target. Can be used for SSL.
-        preds[id]和pools[id]
     '''
 
     def __init__(self, conv: EmbMaskConv, preds: nn.ModuleList,
@@ -502,17 +499,20 @@ class ProMaskNet(nn.Module):
         self.conv = conv
         self.preds = preds
         self.pools = pools
-        self.expand_proto = nn.Linear(hidden_dim, hidden_dim*conv_layer)
-        self.gate_linear = nn.Linear((hidden_dim*conv_layer)*2, hidden_dim*conv_layer)
-        self.mlp = FlexibleMLP(channel_list=[(hidden_dim*conv_layer)*2, hidden_dim*conv_layer, hidden_dim*conv_layer], dropout=[0.5, 0.5])
+        self.expand_proto = nn.Linear(hidden_dim, hidden_dim * conv_layer)
+        self.gate_linear = nn.Linear((hidden_dim * conv_layer) * 2, hidden_dim * conv_layer)
+        self.mlp = FlexibleMLP(
+            channel_list=[(hidden_dim * conv_layer) * 2, hidden_dim * conv_layer, hidden_dim * conv_layer],
+            dropout=[0.5, 0.5])
 
     def NodeEmb(self, x, edge_index, edge_weight, subG_node, edge_index_virtual, z=None):
         embs = []
         protos = []
 
         for _ in range(x.shape[1]):
-            emb, proto_updated, candidate_idx, candidate_subgraph_assignment = self.conv(x[:, _, :].reshape(x.shape[0], x.shape[-1]),
-                            edge_index, edge_weight, subG_node, edge_index_virtual, z)
+            emb, proto_updated, candidate_idx, candidate_subgraph_assignment = self.conv(
+                x[:, _, :].reshape(x.shape[0], x.shape[-1]),
+                edge_index, edge_weight, subG_node, edge_index_virtual, z)
             # temp = emb.reshape(emb.shape[0], 1, emb.shape[-1])
             embs.append(emb.reshape(emb.shape[0], 1, emb.shape[-1]))
             protos.append(proto_updated.reshape(proto_updated.shape[0], 1, proto_updated.shape[-1]))
@@ -533,8 +533,8 @@ class ProMaskNet(nn.Module):
 
         # Construct a ragged list of external nodes for similar node features.
         num_subgraphs = len(subG_node)
-        comp_node_list = [[]for _ in range(num_subgraphs)]
-        candidate_idx = candidate_idx.tolist() # list(216)
+        comp_node_list = [[] for _ in range(num_subgraphs)]
+        candidate_idx = candidate_idx.tolist()  # list(216)
         candidate_subgraph_assignment = candidate_subgraph_assignment.tolist()
 
         for nid, sid in zip(candidate_idx, candidate_subgraph_assignment):
@@ -553,30 +553,34 @@ class ProMaskNet(nn.Module):
         emb = self.mlp(emb_combined)
 
         return emb, sub_emb
+
     def build_virtual_graph(self, subG_node):
         if isinstance(subG_node, torch.Tensor):
             # [B, L] - >List[Tensor]
-            subG_node = [subG_node[i][subG_node[i] != -1]for i in range(subG_node.size(0))]
+            subG_node = [subG_node[i][subG_node[i] != -1] for i in range(subG_node.size(0))]
 
         B = len(subG_node)
         edges = []
         for i in range(B):
-            for j in range(i+1, B):
+            for j in range(i + 1, B):
                 set_i = set(subG_node[i].tolist())
                 set_j = set(subG_node[j].tolist())
                 if len(set_i & set_j) > 0:
                     edges.append([i, j])
                     edges.append([j, i])
-        if len(edges)== 0:
+        if len(edges) == 0:
             return torch.empty((2, 0), dtype=torch.long)
         edge_index_virtual = torch.tensor(edges, dtype=torch.long).T
         return edge_index_virtual
+
     def forward(self, x, edge_index, edge_weight, subG_node, z=None, id=0):
         edge_index_virtual = self.build_virtual_graph(subG_node).to(x.device)
-        emb, sub_emb, candidate_idx, candidate_subgraph_assignment = self.NodeEmb(x, edge_index, edge_weight, subG_node, edge_index_virtual, z)
-        # 对节点嵌入进行池化，生成子图嵌入
-        emb, sub_emb = self.Pool(emb, sub_emb, subG_node, edge_index, candidate_idx, candidate_subgraph_assignment, self.pools[id])  # (80, 128)
+        emb, sub_emb, candidate_idx, candidate_subgraph_assignment = self.NodeEmb(x, edge_index, edge_weight, subG_node,
+                                                                                  edge_index_virtual, z)
+        emb, sub_emb = self.Pool(emb, sub_emb, subG_node, edge_index, candidate_idx, candidate_subgraph_assignment,
+                                 self.pools[id])  # (80, 128)
         return self.preds[id](emb), self.preds[id](sub_emb)  # (, classes)
+
 
 class MyGCNConv(torch.nn.Module):
     '''
